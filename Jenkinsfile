@@ -2,14 +2,14 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'            // your Maven installation name
-        sonarQubeScanner 'SonarQubeScanner'  // your SonarQube Scanner installation name
+        maven 'Maven'                // Your Maven installation name in Jenkins
+        sonarRunner 'SonarQubeScanner'  // Your SonarQube Scanner installation name in Jenkins
     }
 
     environment {
         IMAGE_NAME = 'emmalujoseph/carsaletwo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
-        SONARQUBE_ENV = 'SonarQubeScanner'  // Must match the scanner name above
+        SONARQUBE_ENV = 'SonarQubeScanner'
     }
 
     stages {
@@ -18,14 +18,14 @@ pipeline {
                 checkout scm
             }
         }
-        
+
         stage('Build') {
             steps {
                 bat 'mvn clean package'
                 bat "docker build -t %IMAGE_NAME%:%IMAGE_TAG% ."
             }
         }
-        
+
         stage('SonarQube Analysis') {
             environment {
                 scannerHome = tool 'SonarQubeScanner'
@@ -36,7 +36,7 @@ pipeline {
                 }
             }
         }
-        
+
         stage('Test') {
             steps {
                 bat 'mvn test'
@@ -59,40 +59,30 @@ pipeline {
 
         stage('Deploy to Dev') {
             steps {
-                script {
-                    echo 'Deploying to Development Environment'
-                    bat """
-                    docker stop carsaletwo-dev || echo Container not running
-                    docker rm carsaletwo-dev || echo Container not found
-                    docker run -d -p 8081:8080 --name carsaletwo-dev %IMAGE_NAME%:%IMAGE_TAG%
-                    """
-                }
+                echo "Deploying to Development Environment"
+                // Example: deploy with dev-specific Docker image tag or env variables
+                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
+                bat "docker run -d -p 8081:8080 --name carsaletwo-dev %IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                script {
-                    echo 'Deploying to Test Environment'
-                    bat """
-                    docker stop carsaletwo-test || echo Container not running
-                    docker rm carsaletwo-test || echo Container not found
-                    docker run -d -p 8082:8080 --name carsaletwo-test %IMAGE_NAME%:%IMAGE_TAG%
-                    """
-                }
+                echo "Deploying to Test Environment"
+                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
+                bat "docker stop carsaletwo-test || echo Not running"
+                bat "docker rm carsaletwo-test || echo Not found"
+                bat "docker run -d -p 8082:8080 --name carsaletwo-test %IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                script {
-                    echo 'Deploying to Production Environment'
-                    bat """
-                    docker stop carsaletwo-prod || echo Container not running
-                    docker rm carsaletwo-prod || echo Container not found
-                    docker run -d -p 8080:8080 --name carsaletwo-prod %IMAGE_NAME%:%IMAGE_TAG%
-                    """
-                }
+                echo "Deploying to Production Environment"
+                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
+                bat "docker stop carsaletwo-prod || echo Not running"
+                bat "docker rm carsaletwo-prod || echo Not found"
+                bat "docker run -d -p 8080:8080 --name carsaletwo-prod %IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
     }
