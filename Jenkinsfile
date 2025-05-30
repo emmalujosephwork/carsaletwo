@@ -2,8 +2,7 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'                        // Maven configured in Jenkins
-        sonarRunner 'SonarQubeScanner'       // SonarQube Scanner configured in Jenkins
+        maven 'Maven' // your Maven installation name in Jenkins
     }
 
     environment {
@@ -29,10 +28,10 @@ pipeline {
             steps {
                 withSonarQubeEnv('SonarQubeScanner') {
                     bat """
-                    ${tool 'SonarQubeScanner'}/bin/sonar-scanner.bat ^
-                    -Dsonar.projectKey=carsaletwo ^
-                    -Dsonar.sources=src ^
-                    -Dsonar.java.binaries=target/classes
+                        sonar-scanner ^
+                        -Dsonar.projectKey=carsaletwo ^
+                        -Dsonar.sources=src ^
+                        -Dsonar.java.binaries=target/classes
                     """
                 }
             }
@@ -46,8 +45,8 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                 usernameVariable: 'DOCKERHUB_USER_VAR', 
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                 usernameVariable: 'DOCKERHUB_USER_VAR',
                                                  passwordVariable: 'DOCKERHUB_PASS')]) {
                     bat '''
                         echo %DOCKERHUB_PASS% | docker login -u %DOCKERHUB_USER_VAR% --password-stdin
@@ -60,8 +59,7 @@ pipeline {
 
         stage('Deploy to Dev') {
             steps {
-                echo "Deploying to Development environment"
-                // Example deploy command - adjust for your environment
+                echo 'Deploying to Development environment'
                 bat """
                     docker stop carsaletwo-dev || echo Container not running
                     docker rm carsaletwo-dev || echo Container not found
@@ -72,8 +70,7 @@ pipeline {
 
         stage('Deploy to Test') {
             steps {
-                echo "Deploying to Test environment"
-                // Example deploy command - adjust for your environment
+                echo 'Deploying to Test environment'
                 bat """
                     docker stop carsaletwo-test || echo Container not running
                     docker rm carsaletwo-test || echo Container not found
@@ -84,8 +81,7 @@ pipeline {
 
         stage('Deploy to Prod') {
             steps {
-                echo "Deploying to Production environment"
-                // Example deploy command - adjust for your environment
+                echo 'Deploying to Production environment'
                 bat """
                     docker stop carsaletwo-prod || echo Container not running
                     docker rm carsaletwo-prod || echo Container not found
