@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'              // your Maven installation name in Jenkins
-        sonarRunner 'SonarQubeScanner'  // SonarQube Scanner installation name in Jenkins
+        maven 'Maven'             // Your Maven installation name in Jenkins
+        sonar 'SonarQubeScanner'  // Correct tool type for SonarQube Scanner
     }
 
     environment {
@@ -26,12 +26,9 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            environment {
-                scannerHome = tool 'SonarQubeScanner'
-            }
             steps {
                 withSonarQubeEnv('SonarQubeScanner') {
-                    bat "\"${scannerHome}\\bin\\sonar-scanner.bat\" -Dsonar.projectKey=carsaletwo -Dsonar.sources=src -Dsonar.java.binaries=target/classes"
+                    bat "sonar-scanner -Dsonar.projectKey=carsaletwo -Dsonar.sources=src -Dsonar.java.binaries=target/classes"
                 }
             }
         }
