@@ -2,14 +2,13 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'                // Your Maven installation name in Jenkins
-        sonarRunner 'SonarQubeScanner'  // Your SonarQube Scanner installation name in Jenkins
+        maven 'Maven'  // Your Maven installation name in Jenkins
+        // Remove sonarQubeScanner from here, it's handled differently
     }
 
     environment {
         IMAGE_NAME = 'emmalujoseph/carsaletwo'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
-        SONARQUBE_ENV = 'SonarQubeScanner'
     }
 
     stages {
@@ -28,11 +27,11 @@ pipeline {
 
         stage('SonarQube Analysis') {
             environment {
-                scannerHome = tool 'SonarQubeScanner'
+                scannerHome = tool 'SonarQubeScanner'  // Must exactly match your SonarQube Scanner tool name in Jenkins Global Tools
             }
             steps {
-                withSonarQubeEnv('SonarQubeScanner') {
-                    bat "${scannerHome}/bin/sonar-scanner.bat -Dsonar.projectKey=carsaletwo -Dsonar.sources=src"
+                withSonarQubeEnv('SonarQubeScanner') {  // The SonarQube server name configured in Jenkins global config
+                    bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=carsaletwo -Dsonar.sources=src"
                 }
             }
         }
@@ -60,8 +59,9 @@ pipeline {
         stage('Deploy to Dev') {
             steps {
                 echo "Deploying to Development Environment"
-                // Example: deploy with dev-specific Docker image tag or env variables
                 bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
+                bat "docker stop carsaletwo-dev || echo Not running"
+                bat "docker rm carsaletwo-dev || echo Not found"
                 bat "docker run -d -p 8081:8080 --name carsaletwo-dev %IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
