@@ -1,15 +1,11 @@
 pipeline {
     agent any
 
-    tools {
-        maven 'Maven'     // Your Maven tool name in Jenkins (check Manage Jenkins > Global Tool Configuration)
-        jdk 'jdk17'       // Your JDK 17 installation name in Jenkins
-    }
-
     environment {
-        SONARQUBE_SCANNER = 'SonarQubeScanner'  // SonarQube server installation name configured in Jenkins
-        DOCKER_IMAGE = "emmalujoseph/carsaletwo:latest"
-        REGISTRY_CREDENTIALS = 'dockerhub-credentials'  // Your DockerHub credential ID in Jenkins
+        MAVEN_HOME = tool 'Maven'  // Your Maven installation name in Jenkins
+        JDK_HOME = tool 'JDK17'    // Your JDK 17 installation name in Jenkins
+        DOCKER_IMAGE = "emmalujoseph/carsaletwo"
+        DOCKER_TAG = "${BUILD_NUMBER}"
     }
 
     stages {
@@ -21,35 +17,41 @@ pipeline {
 
         stage('Build') {
             steps {
-                bat '"${MAVEN_HOME}\\bin\\mvn.cmd" clean package'
+                withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
+                    bat "mvn clean package"
+                }
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv(SONARQUBE_SCANNER) {
-                    bat '"${MAVEN_HOME}\\bin\\mvn.cmd" sonar:sonar -Dsonar.projectKey=carsaletwo -Dsonar.sources=src/main/java -Dsonar.java.binaries=target/classes'
+                withSonarQubeEnv('SonarQubeScanner') { // your SonarQube installation name
+                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
+                        bat "mvn sonar:sonar -Dsonar.projectKey=carsaletwo -Dsonar.sources=src/main/java -Dsonar.java.binaries=target/classes"
+                    }
                 }
             }
         }
 
         stage('Test') {
             steps {
-                bat '"${MAVEN_HOME}\\bin\\mvn.cmd" test'
+                withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
+                    bat "mvn test"
+                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat "docker build -t ${DOCKER_IMAGE} ."
+                bat "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    bat "echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin"
-                    bat "docker push ${DOCKER_IMAGE}"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                    bat "docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD%"
+                    bat "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
                     bat "docker logout"
                 }
             }
@@ -57,52 +59,36 @@ pipeline {
 
         stage('Deploy to Dev') {
             steps {
-                echo "Deploying to Dev environment..."
-                bat """
-                docker pull ${DOCKER_IMAGE}
-                docker stop carsaletwo-dev || echo No running dev container to stop
-                docker rm carsaletwo-dev || echo No dev container to remove
-                docker run -d -p 8081:8080 --name carsaletwo-dev ${DOCKER_IMAGE}
-                """
+                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Development environment"
+                bat '''
+                ssh devuser@dev-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                '''
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                echo "Deploying to Test environment..."
-                bat """
-                docker pull ${DOCKER_IMAGE}
-                docker stop carsaletwo-test || echo No running test container to stop
-                docker rm carsaletwo-test || echo No test container to remove
-                docker run -d -p 8082:8080 --name carsaletwo-test ${DOCKER_IMAGE}
-                """
+                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Test environment"
+                bat '''
+                ssh testuser@test-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                '''
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                input message: 'Approve deployment to Production?', ok: 'Deploy'
-                echo "Deploying to Prod environment..."
-                bat """
-                docker pull ${DOCKER_IMAGE}
-                docker stop carsaletwo-prod || echo No running prod container to stop
-                docker rm carsaletwo-prod || echo No prod container to remove
-                docker run -d -p 8080:8080 --name carsaletwo-prod ${DOCKER_IMAGE}
-                """
+                input message: 'Approve deployment to Production environment?'
+                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Production environment"
+                bat '''
+                ssh produser@prod-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                '''
             }
         }
     }
 
     post {
         always {
-            echo 'Cleaning workspace...'
             cleanWs()
-        }
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed. Please check the logs.'
         }
     }
 }
