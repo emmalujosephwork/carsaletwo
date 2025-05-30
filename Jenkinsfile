@@ -4,7 +4,7 @@ pipeline {
     environment {
         DOCKERHUB_USER = 'emmalujoseph'
         DOCKER_IMAGE = "${DOCKERHUB_USER}/carsaletwo"
-        DOCKER_TAG = "latest"  // Change tag as needed
+        DOCKER_TAG = "latest" // Change tag as needed
     }
 
     stages {
@@ -17,7 +17,7 @@ pipeline {
         stage('Build') {
             steps {
                 script {
-                    def mvnHome = tool 'Maven'  // Your Jenkins Maven installation name
+                    def mvnHome = tool 'Maven' // Your Jenkins Maven installation name
                     bat "\"${mvnHome}\\bin\\mvn.cmd\" clean package"
                 }
             }
@@ -25,7 +25,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             environment {
-                scannerHome = tool 'SonarQubeScanner'  // Adjust if your tool name differs
+                scannerHome = tool 'SonarQubeScanner' // Adjust if your tool name differs
             }
             steps {
                 withSonarQubeEnv('SonarQubeScanner') {
@@ -51,41 +51,53 @@ pipeline {
 
         stage('Docker Login & Push') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
-                                                 usernameVariable: 'DOCKERHUB_USER_VAR', 
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                                                 usernameVariable: 'DOCKERHUB_USER_VAR',
                                                  passwordVariable: 'DOCKERHUB_PASS')]) {
-                    bat """
-                    docker login -u %DOCKERHUB_USER_VAR% -p %DOCKERHUB_PASS%
-                    docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                    docker logout
-                    """
+                    bat '''
+                        docker login -u %DOCKERHUB_USER_VAR% -p %DOCKERHUB_PASS%
+                        docker push %DOCKER_IMAGE%:%DOCKER_TAG%
+                        docker logout
+                    '''
                 }
             }
         }
 
         stage('Deploy to Dev') {
             steps {
-                echo "Deploying to Development environment"
+                echo "Deploying to Development environment (Local)"
                 bat """
-                ssh devuser@dev-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker stop carsaletwo-dev 2>nul || echo Container not running
+                    docker rm carsaletwo-dev 2>nul || echo Container does not exist
+                    docker run -d --name carsaletwo-dev -p 8081:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    echo Development deployment completed on port 8081
                 """
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                echo "Deploying to Test environment"
+                echo "Deploying to Test environment (Local)"
                 bat """
-                ssh testuser@test-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker stop carsaletwo-test 2>nul || echo Container not running
+                    docker rm carsaletwo-test 2>nul || echo Container does not exist
+                    docker run -d --name carsaletwo-test -p 8082:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    echo Test deployment completed on port 8082
                 """
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                echo "Deploying to Production environment"
+                echo "Deploying to Production environment (Local)"
                 bat """
-                ssh produser@prod-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                    docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker stop carsaletwo-prod 2>nul || echo Container not running
+                    docker rm carsaletwo-prod 2>nul || echo Container does not exist
+                    docker run -d --name carsaletwo-prod -p 8083:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    echo Production deployment completed on port 8083
                 """
             }
         }
@@ -97,6 +109,10 @@ pipeline {
         }
         success {
             echo "Pipeline completed successfully."
+            echo "Applications deployed:"
+            echo "- Dev: http://localhost:8081"
+            echo "- Test: http://localhost:8082" 
+            echo "- Prod: http://localhost:8083"
         }
         failure {
             echo "Pipeline failed. Please check the logs."
