@@ -2,14 +2,22 @@ pipeline {
     agent any
 
     environment {
-        MAVEN_HOME = tool 'Maven'  // Your Maven installation name in Jenkins
-        JDK_HOME = tool 'jdk17'    // Your JDK 17 installation name in Jenkins
-        DOCKER_IMAGE = "emmalujoseph/carsaletwo"
-        DOCKER_TAG = "${BUILD_NUMBER}"
+        DOCKERHUB_USER = 'emmalujoseph'  // Your Docker Hub username
+        DOCKER_IMAGE = "${DOCKERHUB_USER}/carsaletwo"
+        DOCKER_TAG = "latest"
+        
+        // Replace these with your real server IPs or hostnames
+        DEV_SERVER = "192.168.1.100"
+        TEST_SERVER = "192.168.1.101"
+        PROD_SERVER = "192.168.1.102"
+        
+        DEV_USER = "devuser"   // SSH user for dev server
+        TEST_USER = "testuser" // SSH user for test server
+        PROD_USER = "produser" // SSH user for prod server
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
@@ -17,71 +25,68 @@ pipeline {
 
         stage('Build') {
             steps {
-                withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
-                    bat "mvn clean package"
-                }
+                bat 'mvn clean package'
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Docker Login') {
             steps {
-                withSonarQubeEnv('SonarQubeScanner') { // your SonarQube installation name
-                    withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
-                        bat "mvn sonar:sonar -Dsonar.projectKey=carsaletwo -Dsonar.sources=src/main/java -Dsonar.java.binaries=target/classes"
-                    }
-                }
-            }
-        }
-
-        stage('Test') {
-            steps {
-                withEnv(["PATH+MAVEN=${MAVEN_HOME}/bin", "JAVA_HOME=${JDK_HOME}"]) {
-                    bat "mvn test"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                 usernameVariable: 'DOCKERHUB_USER_VAR', 
+                                                 passwordVariable: 'DOCKERHUB_PASS')]) {
+                    bat '''
+                    docker login -u %DOCKERHUB_USER_VAR% -p %DOCKERHUB_PASS%
+                    '''
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                bat "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                bat """
+                docker build -t %DOCKER_IMAGE%:%DOCKER_TAG% .
+                """
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
-                    bat "docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD%"
-                    bat "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    bat "docker logout"
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
+                                                 usernameVariable: 'DOCKERHUB_USER_VAR', 
+                                                 passwordVariable: 'DOCKERHUB_PASS')]) {
+                    bat """
+                    docker login -u %DOCKERHUB_USER_VAR% -p %DOCKERHUB_PASS%
+                    docker push %DOCKER_IMAGE%:%DOCKER_TAG%
+                    docker logout
+                    """
                 }
             }
         }
 
         stage('Deploy to Dev') {
             steps {
-                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Development environment"
-                bat '''
-                ssh devuser@dev-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                '''
+                echo "Deploying to Dev Server"
+                bat """
+                ssh %DEV_USER%@%DEV_SERVER% "docker pull %DOCKER_IMAGE%:%DOCKER_TAG% && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 %DOCKER_IMAGE%:%DOCKER_TAG%"
+                """
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Test environment"
-                bat '''
-                ssh testuser@test-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                '''
+                echo "Deploying to Test Server"
+                bat """
+                ssh %TEST_USER%@%TEST_SERVER% "docker pull %DOCKER_IMAGE%:%DOCKER_TAG% && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 %DOCKER_IMAGE%:%DOCKER_TAG%"
+                """
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                input message: 'Approve deployment to Production environment?'
-                echo "Deploying Docker image ${DOCKER_IMAGE}:${DOCKER_TAG} to Production environment"
-                bat '''
-                ssh produser@prod-server "docker pull ${DOCKER_IMAGE}:${DOCKER_TAG} && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                '''
+                echo "Deploying to Prod Server"
+                bat """
+                ssh %PROD_USER%@%PROD_SERVER% "docker pull %DOCKER_IMAGE%:%DOCKER_TAG% && docker stop carsaletwo || true && docker rm carsaletwo || true && docker run -d --name carsaletwo -p 8080:8080 %DOCKER_IMAGE%:%DOCKER_TAG%"
+                """
             }
         }
     }
@@ -89,6 +94,9 @@ pipeline {
     post {
         always {
             cleanWs()
+        }
+        failure {
+            echo "Pipeline failed. Please check the logs."
         }
     }
 }
