@@ -70,7 +70,7 @@ pipeline {
                     docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker stop carsaletwo-dev 2>nul || echo Container not running
                     docker rm carsaletwo-dev 2>nul || echo Container does not exist
-                    docker run -d --name carsaletwo-dev -p 8081:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker run -d --name carsaletwo-dev -p 8081:8080 -e SPRING_PROFILES_ACTIVE=dev ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo Development deployment completed on port 8081
                 """
             }
@@ -83,7 +83,7 @@ pipeline {
                     docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker stop carsaletwo-test 2>nul || echo Container not running
                     docker rm carsaletwo-test 2>nul || echo Container does not exist
-                    docker run -d --name carsaletwo-test -p 8082:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker run -d --name carsaletwo-test -p 8082:8080 -e SPRING_PROFILES_ACTIVE=test ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo Test deployment completed on port 8082
                 """
             }
@@ -96,7 +96,7 @@ pipeline {
                     docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker stop carsaletwo-prod 2>nul || echo Container not running
                     docker rm carsaletwo-prod 2>nul || echo Container does not exist
-                    docker run -d --name carsaletwo-prod -p 8083:8080 ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker run -d --name carsaletwo-prod -p 8083:8080 -e SPRING_PROFILES_ACTIVE=prod ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo Production deployment completed on port 8083
                 """
             }
