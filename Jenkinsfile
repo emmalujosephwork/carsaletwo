@@ -1,12 +1,14 @@
 pipeline {
     agent any
 
+    tools {
+        maven 'Maven'       // Replace with your Maven tool name in Jenkins
+        jdk 'jdk11'         // Replace with your JDK tool name in Jenkins
+    }
+
     environment {
-        DOCKER_IMAGE = "emmalujoseph/carsaletwo"
-        DOCKER_TAG = "latest"
-        DOCKER_CREDENTIALS = "dockerhub-creds"    // your DockerHub credentials ID
-        SONARQUBE_INSTALLATION = "SonarQubeScanner"  // your SonarQube Scanner installation name in Jenkins
-        MAVEN_TOOL = "Maven"   // your Maven tool installation name in Jenkins
+        SONARQUBE_SCANNER = 'SonarQubeScanner'  // Your SonarQube server installation name
+        DOCKER_IMAGE = "emmalujoseph/carsaletwo:38"
     }
 
     stages {
@@ -18,73 +20,58 @@ pipeline {
 
         stage('Build') {
             steps {
-                tool name: "${MAVEN_TOOL}", type: 'maven'
-                bat "\"${tool MAVEN_TOOL}\\bin\\mvn.cmd\" clean package"
+                bat '"${MAVEN_HOME}\\bin\\mvn.cmd" clean package'
             }
         }
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv("${SONARQUBE_INSTALLATION}") {
-                    bat "\"${tool MAVEN_TOOL}\\bin\\mvn.cmd\" sonar:sonar -Dsonar.projectKey=carsaletwo -Dsonar.sources=src/main/java -Dsonar.java.binaries=target/classes"
+                withSonarQubeEnv(SONARQUBE_SCANNER) {
+                    bat '"${MAVEN_HOME}\\bin\\mvn.cmd" sonar:sonar -Dsonar.projectKey=carsaletwo -Dsonar.sources=src/main/java -Dsonar.java.binaries=target/classes'
                 }
             }
         }
 
         stage('Test') {
             steps {
-                bat "\"${tool MAVEN_TOOL}\\bin\\mvn.cmd\" test"
+                bat '"${MAVEN_HOME}\\bin\\mvn.cmd" test'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                script {
-                    dockerImage = docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                }
+                bat "docker build -t ${DOCKER_IMAGE} ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
-                    bat "echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin"
-                    bat "docker push ${DOCKER_IMAGE}:${DOCKER_TAG}"
-                    bat "docker logout"
-                }
+                bat "docker push ${DOCKER_IMAGE}"
             }
         }
 
         stage('Deploy to Dev') {
             steps {
-                bat """
-                docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
-                docker stop carsaletwo-dev || exit 0
-                docker rm carsaletwo-dev || exit 0
-                docker run -d -p 8081:8080 --name carsaletwo-dev ${DOCKER_IMAGE}:${DOCKER_TAG}
-                """
+                echo 'Deploying to Development environment...'
+                // Example deployment command, replace with your real deploy script or commands:
+                // bat 'kubectl apply -f k8s/dev-deployment.yaml'
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                bat """
-                docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
-                docker stop carsaletwo-test || exit 0
-                docker rm carsaletwo-test || exit 0
-                docker run -d -p 8082:8080 --name carsaletwo-test ${DOCKER_IMAGE}:${DOCKER_TAG}
-                """
+                echo 'Deploying to Test environment...'
+                // Replace with your actual deployment commands:
+                // bat 'kubectl apply -f k8s/test-deployment.yaml'
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                bat """
-                docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
-                docker stop carsaletwo-prod || exit 0
-                docker rm carsaletwo-prod || exit 0
-                docker run -d -p 8080:8080 --name carsaletwo-prod ${DOCKER_IMAGE}:${DOCKER_TAG}
-                """
+                input message: 'Approve deployment to Production?', ok: 'Deploy'
+                echo 'Deploying to Production environment...'
+                // Replace with your actual deployment commands:
+                // bat 'kubectl apply -f k8s/prod-deployment.yaml'
             }
         }
     }
@@ -95,7 +82,7 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline completed successfully!'
+            echo 'Pipeline succeeded!'
         }
         failure {
             echo 'Pipeline failed.'
