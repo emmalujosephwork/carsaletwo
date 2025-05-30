@@ -2,13 +2,14 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'       // Replace with your Maven tool name in Jenkins
-        jdk 'jdk17'         // Replace with your JDK tool name in Jenkins
+        maven 'Maven'     // Your Maven tool name in Jenkins (check Manage Jenkins > Global Tool Configuration)
+        jdk 'jdk17'       // Your JDK 17 installation name in Jenkins
     }
 
     environment {
-        SONARQUBE_SCANNER = 'SonarQubeScanner'  // Your SonarQube server installation name
-        DOCKER_IMAGE = "emmalujoseph/carsaletwo:38"
+        SONARQUBE_SCANNER = 'SonarQubeScanner'  // SonarQube server installation name configured in Jenkins
+        DOCKER_IMAGE = "emmalujoseph/carsaletwo:latest"
+        REGISTRY_CREDENTIALS = 'dockerhub-credentials'  // Your DockerHub credential ID in Jenkins
     }
 
     stages {
@@ -46,32 +47,48 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
-                bat "docker push ${DOCKER_IMAGE}"
+                withCredentials([usernamePassword(credentialsId: REGISTRY_CREDENTIALS, usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    bat "echo %DOCKER_PASS% | docker login -u %DOCKER_USER% --password-stdin"
+                    bat "docker push ${DOCKER_IMAGE}"
+                    bat "docker logout"
+                }
             }
         }
 
         stage('Deploy to Dev') {
             steps {
-                echo 'Deploying to Development environment...'
-                // Example deployment command, replace with your real deploy script or commands:
-                // bat 'kubectl apply -f k8s/dev-deployment.yaml'
+                echo "Deploying to Dev environment..."
+                bat """
+                docker pull ${DOCKER_IMAGE}
+                docker stop carsaletwo-dev || echo No running dev container to stop
+                docker rm carsaletwo-dev || echo No dev container to remove
+                docker run -d -p 8081:8080 --name carsaletwo-dev ${DOCKER_IMAGE}
+                """
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                echo 'Deploying to Test environment...'
-                // Replace with your actual deployment commands:
-                // bat 'kubectl apply -f k8s/test-deployment.yaml'
+                echo "Deploying to Test environment..."
+                bat """
+                docker pull ${DOCKER_IMAGE}
+                docker stop carsaletwo-test || echo No running test container to stop
+                docker rm carsaletwo-test || echo No test container to remove
+                docker run -d -p 8082:8080 --name carsaletwo-test ${DOCKER_IMAGE}
+                """
             }
         }
 
         stage('Deploy to Prod') {
             steps {
                 input message: 'Approve deployment to Production?', ok: 'Deploy'
-                echo 'Deploying to Production environment...'
-                // Replace with your actual deployment commands:
-                // bat 'kubectl apply -f k8s/prod-deployment.yaml'
+                echo "Deploying to Prod environment..."
+                bat """
+                docker pull ${DOCKER_IMAGE}
+                docker stop carsaletwo-prod || echo No running prod container to stop
+                docker rm carsaletwo-prod || echo No prod container to remove
+                docker run -d -p 8080:8080 --name carsaletwo-prod ${DOCKER_IMAGE}
+                """
             }
         }
     }
@@ -82,10 +99,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline succeeded!'
+            echo 'Pipeline completed successfully!'
         }
         failure {
-            echo 'Pipeline failed.'
+            echo 'Pipeline failed. Please check the logs.'
         }
     }
 }
