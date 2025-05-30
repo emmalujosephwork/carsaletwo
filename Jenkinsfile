@@ -70,7 +70,7 @@ pipeline {
                     docker pull ${DOCKER_IMAGE}:${DOCKER_TAG}
                     docker stop carsaletwo-dev 2>nul || echo Container not running
                     docker rm carsaletwo-dev 2>nul || echo Container does not exist
-                    docker run -d --name carsaletwo-dev -p 8081:8080 -e SPRING_PROFILES_ACTIVE=dev ${DOCKER_IMAGE}:${DOCKER_TAG}
+                    docker run -d --name carsaletwo-dev -p 8081:8081 -e SPRING_PROFILES_ACTIVE=dev ${DOCKER_IMAGE}:${DOCKER_TAG}
                     echo Development deployment completed on port 8081
                 """
             }
