@@ -24,17 +24,20 @@ pipeline {
             }
         }
 
+        // COMMENTED OUT UNTIL SONARQUBE IS PROPERLY CONFIGURED
+        /*
         stage('SonarQube Analysis') {
             steps {
                 script {
                     // Get Sonar scanner installation path
-                    def scannerHome = tool 'SonarQubeScanner'  // Tool name from Global Tool Config
-                    withSonarQubeEnv('SonarQubeServer') {     // Your SonarQube Server name in Jenkins config
+                    def scannerHome = tool 'SonarQubeScanner' // Tool name from Global Tool Config
+                    withSonarQubeEnv('SonarQubeServer') { // Your SonarQube Server name in Jenkins config
                         bat "\"${scannerHome}\\bin\\sonar-scanner.bat\" -Dsonar.projectKey=carsaletwo -Dsonar.sources=src -Dsonar.java.binaries=target/classes"
                     }
                 }
             }
         }
+        */
 
         stage('Test') {
             steps {
