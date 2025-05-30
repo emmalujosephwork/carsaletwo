@@ -2,8 +2,8 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'  // Your Maven installation name in Jenkins
-        // Remove sonarQubeScanner from here, it's handled differently
+        maven 'Maven'                        // Maven configured in Jenkins
+        sonarRunner 'SonarQubeScanner'       // SonarQube Scanner configured in Jenkins
     }
 
     environment {
@@ -26,12 +26,14 @@ pipeline {
         }
 
         stage('SonarQube Analysis') {
-            environment {
-                scannerHome = tool 'SonarQubeScanner'  // Must exactly match your SonarQube Scanner tool name in Jenkins Global Tools
-            }
             steps {
-                withSonarQubeEnv('SonarQubeScanner') {  // The SonarQube server name configured in Jenkins global config
-                    bat "${scannerHome}\\bin\\sonar-scanner.bat -Dsonar.projectKey=carsaletwo -Dsonar.sources=src"
+                withSonarQubeEnv('SonarQubeScanner') {
+                    bat """
+                    ${tool 'SonarQubeScanner'}/bin/sonar-scanner.bat ^
+                    -Dsonar.projectKey=carsaletwo ^
+                    -Dsonar.sources=src ^
+                    -Dsonar.java.binaries=target/classes
+                    """
                 }
             }
         }
@@ -42,7 +44,7 @@ pipeline {
             }
         }
 
-        stage('Push Image') {
+        stage('Push Docker Image') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', 
                                                  usernameVariable: 'DOCKERHUB_USER_VAR', 
@@ -58,31 +60,37 @@ pipeline {
 
         stage('Deploy to Dev') {
             steps {
-                echo "Deploying to Development Environment"
-                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
-                bat "docker stop carsaletwo-dev || echo Not running"
-                bat "docker rm carsaletwo-dev || echo Not found"
-                bat "docker run -d -p 8081:8080 --name carsaletwo-dev %IMAGE_NAME%:%IMAGE_TAG%"
+                echo "Deploying to Development environment"
+                // Example deploy command - adjust for your environment
+                bat """
+                    docker stop carsaletwo-dev || echo Container not running
+                    docker rm carsaletwo-dev || echo Container not found
+                    docker run -d --name carsaletwo-dev -p 8081:8080 %IMAGE_NAME%:%IMAGE_TAG%
+                """
             }
         }
 
         stage('Deploy to Test') {
             steps {
-                echo "Deploying to Test Environment"
-                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
-                bat "docker stop carsaletwo-test || echo Not running"
-                bat "docker rm carsaletwo-test || echo Not found"
-                bat "docker run -d -p 8082:8080 --name carsaletwo-test %IMAGE_NAME%:%IMAGE_TAG%"
+                echo "Deploying to Test environment"
+                // Example deploy command - adjust for your environment
+                bat """
+                    docker stop carsaletwo-test || echo Container not running
+                    docker rm carsaletwo-test || echo Container not found
+                    docker run -d --name carsaletwo-test -p 8082:8080 %IMAGE_NAME%:%IMAGE_TAG%
+                """
             }
         }
 
         stage('Deploy to Prod') {
             steps {
-                echo "Deploying to Production Environment"
-                bat "docker pull %IMAGE_NAME%:%IMAGE_TAG%"
-                bat "docker stop carsaletwo-prod || echo Not running"
-                bat "docker rm carsaletwo-prod || echo Not found"
-                bat "docker run -d -p 8080:8080 --name carsaletwo-prod %IMAGE_NAME%:%IMAGE_TAG%"
+                echo "Deploying to Production environment"
+                // Example deploy command - adjust for your environment
+                bat """
+                    docker stop carsaletwo-prod || echo Container not running
+                    docker rm carsaletwo-prod || echo Container not found
+                    docker run -d --name carsaletwo-prod -p 8080:8080 %IMAGE_NAME%:%IMAGE_TAG%
+                """
             }
         }
     }
