@@ -60,7 +60,7 @@
         <artifactId>spring-boot-maven-plugin</artifactId>
         <version>2.7.5</version> <!-- Match Spring Boot version -->
         <configuration>
-          <mainClass>com.example.carsaletwo.CarSaleTwoApplication</mainClass>
+          <mainClass>com.example.carsaletwo.CarSaleApplication</mainClass>
         </configuration>
       </plugin>
     </plugins>
