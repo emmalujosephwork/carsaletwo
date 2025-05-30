@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         MAVEN_HOME = tool 'Maven'  // Your Maven installation name in Jenkins
-        JDK_HOME = tool 'JDK17'    // Your JDK 17 installation name in Jenkins
+        JDK_HOME = tool 'jdk17'    // Your JDK 17 installation name in Jenkins
         DOCKER_IMAGE = "emmalujoseph/carsaletwo"
         DOCKER_TAG = "${BUILD_NUMBER}"
     }
