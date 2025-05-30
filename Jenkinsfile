@@ -30,9 +30,12 @@ pipeline {
         stage('Deploy to Test') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                    bat 'docker login -u %DOCKERHUB_USER% -p %DOCKERHUB_PASS%'
+                    // Use echo + pipe for password instead of -p flag for security and reliability
+                    bat """
+                    echo %DOCKERHUB_PASS% | docker login -u %DOCKERHUB_USER% --password-stdin
+                    docker push %IMAGE_NAME%:%IMAGE_TAG%
+                    """
                 }
-                bat "docker push %IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
     }
