@@ -2,12 +2,12 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven'  // Make sure this matches your Maven tool name in Jenkins configuration
+        maven 'Maven'  // Make sure this matches your Maven tool name in Jenkins config
     }
 
     environment {
         IMAGE_NAME = 'emmalujoseph/carsaletwo'
-        IMAGE_TAG = "${env.BUILD_NUMBER}"  // Use build number only as tag to avoid double colon error
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -29,7 +29,7 @@ pipeline {
         }
         stage('Deploy to Test') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
                     bat 'docker login -u %DOCKERHUB_USER% -p %DOCKERHUB_PASS%'
                 }
                 bat "docker push %IMAGE_NAME%:%IMAGE_TAG%"
